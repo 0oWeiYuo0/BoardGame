@@ -126,9 +126,6 @@
   .gcard.noimg { background: linear-gradient(160deg, #3a2a1c, #1a120c); border: 2px solid var(--line); }
   .gcard.noimg img { display: none; }
   .gcard.noimg .fallback { display: flex; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 30cqw; }
-  .gcard.gen { background: none; border: 0; }
-  .gcard.gen .fallback { align-items: stretch; }
-  .gcard.gen .fallback svg { display: block; width: 100%; height: 100%; }
 
   #current { display: flex; justify-content: center; margin-top: 4px; }
   .gcard.big { width: min(54vw, 210px); }
@@ -271,9 +268,8 @@ const firebaseConfig = {
 // ===== 外觀設定：圖片對應與名稱都在這裡，換圖、改名只要改這一區 =====
 // 圖片放在 img/ 資料夾，檔名不含 .webp。找不到圖片時，卡片會自動改顯示 icon。
 const IMG_DIR = "img/";
-// 寶石牌目前還沒有專屬圖片（img 設成 null），會自動用程式畫的紫水晶牌。
-// 之後生好圖，放進 img/ 並把這裡改成 { img: "檔名（不含 .webp）", icon: "💎" } 就會換上去。
-const TREASURE_ART = { img: null, icon: "💎" };
+// 寶石牌（所有寶石牌共用同一張圖，分數由卡片下方的文字顯示）
+const TREASURE_ART = { img: "treasure-crystal", icon: "💎" };
 const HAZARD_ART = {
   snake:    { img: "hazard-snake",    icon: "🐍" },
   spider:   { img: "hazard-spider",   icon: "🕷️" },
@@ -290,37 +286,6 @@ const ARTIFACT_ART = {
   12: { img: "artifact-mask",    name: "印加黃金面具" },
 };
 
-// ----- 沒有專屬圖片時，用程式畫一張紫水晶寶石牌（尺寸比例與其他卡片相同） -----
-function crystal(cx, base, w, h, rot) {
-  const L = cx - w / 2, R = cx + w / 2, mid = base - h * 0.68, tip = base - h;
-  return `<g transform="rotate(${rot} ${cx} ${base})">` +
-    `<polygon points="${L},${base} ${L},${mid} ${cx},${tip} ${R},${mid} ${R},${base}" fill="url(#tg-cr)"/>` +
-    `<polygon points="${L},${base} ${L},${mid} ${cx},${tip} ${cx - w * 0.1},${base}" fill="#fff" opacity=".28"/>` +
-    `<polygon points="${R},${base} ${R},${mid} ${cx},${tip} ${cx + w * 0.12},${base}" fill="#1b0b4d" opacity=".35"/>` +
-    `<polyline points="${cx},${tip} ${cx - w * 0.1},${base}" stroke="#efe6ff" stroke-width="2" fill="none" opacity=".6"/></g>`;
-}
-const TREASURE_SVG = `<svg viewBox="0 0 806 1168" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
-<defs>
-  <linearGradient id="tg-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2118"/><stop offset="1" stop-color="#120d09"/></linearGradient>
-  <radialGradient id="tg-glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffcf6b" stop-opacity=".55"/><stop offset="1" stop-color="#ffcf6b" stop-opacity="0"/></radialGradient>
-  <linearGradient id="tg-cr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e3d6ff"/><stop offset=".5" stop-color="#9a6bff"/><stop offset="1" stop-color="#4a24a8"/></linearGradient>
-</defs>
-<rect width="806" height="1168" rx="22" fill="#3b4048"/>
-<rect x="26" y="26" width="754" height="1116" rx="12" fill="url(#tg-bg)"/>
-<ellipse cx="403" cy="640" rx="330" ry="330" fill="url(#tg-glow)"/>
-${crystal(300, 850, 110, 240, -14)}${crystal(506, 850, 110, 260, 12)}${crystal(403, 850, 150, 340, 0)}
-<rect x="250" y="850" width="306" height="82" fill="#6b5b49" stroke="#2a221b" stroke-width="3"/>
-<rect x="150" y="932" width="506" height="60" fill="#51463a" stroke="#2a221b" stroke-width="3"/>
-<rect x="110" y="992" width="586" height="38" fill="#43392f" stroke="#2a221b" stroke-width="3"/>
-${crystal(185, 990, 70, 150, -18)}${crystal(622, 990, 76, 160, 16)}${crystal(120, 1022, 46, 90, -8)}${crystal(690, 1022, 50, 100, 8)}
-<rect x="26" y="1030" width="754" height="112" fill="#241d17"/>
-<path d="M26 1068 H780 M26 1106 H780 M200 1030 V1068 M520 1030 V1068 M360 1068 V1106 M640 1068 V1106 M120 1068 V1106 M260 1106 V1142 M560 1106 V1142" stroke="#15100c" stroke-width="3" fill="none"/>
-<rect x="40" y="40" width="726" height="88" rx="10" fill="#2f353b" stroke="#1a1d20" stroke-width="3"/>
-<text x="403" y="100" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="44" fill="#c9a24e" letter-spacing="3">AMETHYST HOARD</text>
-<path d="M255 128 h296 l-22 64 h-252 z" fill="#2f353b" stroke="#1a1d20" stroke-width="3"/>
-<text x="403" y="172" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="40" fill="#d8d0c0" letter-spacing="4">TREASURE</text>
-<path d="M26 26 L130 26 L26 130 Z" fill="#a4802f" opacity=".9"/><path d="M780 26 L676 26 L780 130 Z" fill="#a4802f" opacity=".9"/>
-</svg>`;
 const ARTIFACT_FALLBACK = { img: "artifact-eagle", name: "神器" };
 
 const app  = initializeApp(firebaseConfig);
@@ -471,8 +436,7 @@ function cardEl(cardCode, opts) {
   const info = cardInfo(cardCode);
   const d = el("div", "gcard " + info.cls + (o.big ? " big" : " thumb")
     + (o.latest ? " latest" : "") + (o.flip ? " flip" : ""));
-  const hasImg = !!info.art.img;
-  if (hasImg) {
+  if (info.art.img) {
     const img = document.createElement("img");
     img.src = IMG_DIR + info.art.img + ".webp";
     img.alt = info.label;
@@ -480,11 +444,8 @@ function cardEl(cardCode, opts) {
     d.appendChild(img);
   } else {
     d.classList.add("noimg");
-    d.classList.add("gen");                                          // 沒有圖片：用程式畫的版本
   }
-  const fb = el("div", "fallback", hasImg || info.cls !== "treasure" ? info.icon : "");
-  if (!hasImg && info.cls === "treasure") fb.innerHTML = TREASURE_SVG;
-  d.appendChild(fb);
+  d.appendChild(el("div", "fallback", info.icon));
   const capText = o.big ? info.cap : info.short;
   if (capText) d.appendChild(el("div", "cap", capText));
   return d;
@@ -508,7 +469,7 @@ function render() {
   }
 
   const players = s.players || {};
-  $("debug").textContent = "v5 · " + s.phase + " · 第" + s.turn + "回合 · 已選 " + Object.keys(s.ready || {}).length + "/" + (s.needed || 0);
+  $("debug").textContent = "v6 · " + s.phase + " · 第" + s.turn + "回合 · 已選 " + Object.keys(s.ready || {}).length + "/" + (s.needed || 0);
   const list = Object.entries(players)
     .map(([id, p]) => ({ id, ...p }))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
