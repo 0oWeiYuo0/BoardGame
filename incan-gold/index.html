@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0c0807">
+<title>印加寶藏</title>
+<style>
+  /* ===== 外觀：顏色都集中在這裡，要換風格先改這一區 ===== */
+  :root {
+    --fg: #f4ead7;          /* 一般文字 */
+    --muted: #bfae8e;       /* 次要文字 */
+    --gold: #e8b64a;        /* 主色：金色 */
+    --gold-soft: #f6dc9a;
+    --line: rgba(232,182,74,.38);
+    --danger: #ff7a6b;      /* 危險 */
+    --jade: #4fd1a1;        /* 安全／已完成 */
+    --amethyst: #c4b0ff;    /* 神器 */
+    --panel-top: rgba(30,21,15,.90);
+    --panel-bottom: rgba(14,10,8,.93);
+  }
+  html { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; color: var(--fg); background: #0c0807;
+    font-family: system-ui, -apple-system, "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    line-height: 1.5;
+  }
+  /* 背景圖固定在畫面後方，內容捲動時背景不動 */
+  #scene { position: fixed; inset: 0; z-index: -1; background: #0c0807 url(img/bg.webp) center / cover no-repeat; }
+  #scene::after { content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 35%, rgba(0,0,0,.6) 100%); }
+
+  /* 背景圖本身有一個深色外框（原圖 x509~1161、y170~729）。
+     --S 是背景圖目前被放大的倍率（cover），用它把面板精準蓋在那個外框上。 */
+  :root { --S: max(100vw / 1672, 100vh / 941); }
+  main {
+    padding: 0 12px 40px;
+    padding-top: max(12px, calc(170 * var(--S) - (941 * var(--S) - 100vh) / 2 - 86px));
+  }
+  .panel { width: min(100%, calc(653 * var(--S) + 14px)); min-height: calc(560 * var(--S) + 14px); margin: 0 auto; }
+  .panel > * { width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; }
+  #lobby { display: flex; flex-direction: column; justify-content: center; }
+  h1 {
+    margin: 0 0 40px; line-height: 1.25; text-align: center; font-size: 2rem; letter-spacing: .25em; padding-left: .25em;
+    font-family: "Noto Serif TC", "Source Han Serif TC", "Songti TC", "PMingLiU", Georgia, serif;
+    background: linear-gradient(180deg, #fff1c9, #e8b64a 55%, #b9791b);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.8));
+  }
+  h1::before, h1::after { content: "✦"; font-size: .9rem; vertical-align: middle; margin: 0 .6em; color: var(--gold); -webkit-text-fill-color: var(--gold); opacity: .8; }
+  h3 { margin: 18px 0 8px; font-size: 1rem; color: var(--gold-soft); letter-spacing: .08em; }
+
+  /* 石板面板 */
+  section.panel {
+    padding: 18px; border-radius: 14px; border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--panel-top), var(--panel-bottom));
+    box-shadow: 0 0 0 1px rgba(0,0,0,.7), 0 18px 50px rgba(0,0,0,.65), inset 0 0 40px rgba(232,182,74,.06);
+    backdrop-filter: blur(3px);
+  }
+
+  /* 按鈕 */
+  button {
+    font: inherit; font-weight: 700; letter-spacing: .06em; cursor: pointer;
+    padding: 10px 22px; border-radius: 10px; border: 1px solid #7a5513; color: #2b1a06;
+    background: linear-gradient(180deg, #f8e2a6, #d19a30);
+    box-shadow: 0 2px 0 #7a5513, 0 6px 14px rgba(0,0,0,.5);
+    transition: transform .08s, filter .15s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 0 0 #7a5513, 0 3px 8px rgba(0,0,0,.5); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.secondary { background: rgba(0,0,0,.4); color: var(--gold-soft); border-color: var(--line); box-shadow: none; }
+  button.big { padding: 15px 22px; font-size: 1.08rem; flex: 1; }
+  button.go { color: #fff; border-color: #7b2208; text-shadow: 0 1px 1px rgba(0,0,0,.45);
+    background: linear-gradient(180deg, #ffb35c, #e0501f);
+    box-shadow: 0 2px 0 #7b2208, 0 6px 14px rgba(0,0,0,.5), 0 0 20px rgba(255,120,40,.28); }
+  button.back { color: #fff; border-color: #0d4d37; text-shadow: 0 1px 1px rgba(0,0,0,.45);
+    background: linear-gradient(180deg, #70d6ad, #1f8f6a);
+    box-shadow: 0 2px 0 #0d4d37, 0 6px 14px rgba(0,0,0,.5); }
+
+  .row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+  input {
+    font: inherit; padding: 10px; text-align: center; color: var(--fg);
+    border: 1px solid var(--line); border-radius: 10px; background: rgba(0,0,0,.42);
+  }
+  input::placeholder { color: #8f7f63; }
+  input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+  #nameInput { width: 100%; margin-top: 4px; }
+  #codeInput { width: 7em; text-transform: uppercase; letter-spacing: .2em; }
+  .back-lobby { position: fixed; top: 10px; left: 12px; z-index: 5; padding: 5px 12px; border-radius: 999px; font-size: .85rem;
+    color: var(--gold-soft); text-decoration: none; background: rgba(12,8,6,.7); border: 1px solid var(--line); }
+  .back-lobby:hover { filter: brightness(1.2); }
+  .center { text-align: center; }
+  .msg { min-height: 1.4em; color: var(--danger); margin: 12px 0 0; text-align: center; }
+  .small { font-size: .85rem; color: var(--muted); }
+
+  details { margin-top: 14px; font-size: .92rem; color: var(--muted); }
+  summary { cursor: pointer; color: var(--gold-soft); }
+  details p { margin: 8px 0; }
+
+  /* 上方資訊列 */
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #roomCode { font-size: 1.35rem; letter-spacing: .3em; color: var(--gold-soft); font-family: Georgia, serif; }
+  #roundInfo { font-weight: 600; }
+  #pips { display: inline-flex; gap: 5px; margin-left: 8px; vertical-align: middle; }
+  .pip { width: 11px; height: 11px; transform: rotate(45deg); border: 1px solid var(--gold); background: transparent; }
+  .pip.done { background: var(--gold); }
+  .pip.now { background: var(--gold-soft); box-shadow: 0 0 8px var(--gold); }
+
+  /* ===== 卡牌 ===== */
+  .gcard {
+    position: relative; aspect-ratio: 806 / 1168; border-radius: 9px; overflow: hidden;
+    background: #1b1612; box-shadow: 0 6px 16px rgba(0,0,0,.65);
+    container-type: inline-size;
+  }
+  .gcard img { display: block; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+  /* 卡片最下方有一條空白石磚，剛好拿來放分數 */
+  .gcard .cap {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 11.5%;
+    display: flex; align-items: center; justify-content: center; line-height: 1;
+    font-weight: 800; letter-spacing: .04em; color: var(--gold-soft);
+    text-shadow: 0 1px 2px #000, 0 0 6px #000; pointer-events: none; font-size: 18px; font-size: 12cqw;
+  }
+  .gcard.hazard .cap { color: #ffb8ad; }
+  .gcard.artifact .cap { color: #e1d6ff; }
+  .gcard .fallback { display: none; }
+  .gcard.noimg { background: linear-gradient(160deg, #3a2a1c, #1a120c); border: 2px solid var(--line); }
+  .gcard.noimg img { display: none; }
+  .gcard.noimg .fallback { display: flex; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 30cqw; }
+
+  #current { display: flex; justify-content: center; margin-top: 4px; }
+  .gcard.big { width: min(54vw, 210px); }
+  .gcard.big.treasure { box-shadow: 0 0 30px rgba(232,182,74,.45), 0 8px 20px rgba(0,0,0,.7); }
+  .gcard.big.hazard { box-shadow: 0 0 30px rgba(255,90,70,.5), 0 8px 20px rgba(0,0,0,.7); }
+  .gcard.big.artifact { box-shadow: 0 0 30px rgba(170,140,255,.55), 0 8px 20px rgba(0,0,0,.7); }
+  .gcard.flip { animation: flipIn .7s cubic-bezier(.2,.8,.3,1); }
+  @keyframes flipIn {
+    0%   { transform: perspective(700px) rotateY(88deg) scale(.92); opacity: .15; filter: brightness(2); }
+    60%  { opacity: 1; }
+    100% { transform: perspective(700px) rotateY(0) scale(1); opacity: 1; filter: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .gcard.flip { animation: none; } }
+  /* ===== 本輪結束提示 ===== */
+  .overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: rgba(6,4,3,.78); backdrop-filter: blur(2px); animation: fadeIn .25s ease-out; }
+  .dialog { width: min(100%, 400px); max-height: 100%; overflow-y: auto; text-align: center; padding: 22px 20px 20px;
+    border-radius: 14px; border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--panel-top), var(--panel-bottom));
+    box-shadow: 0 0 0 1px rgba(0,0,0,.7), 0 18px 60px rgba(0,0,0,.8), 0 0 40px rgba(255,90,70,.18);
+    animation: popIn .35s cubic-bezier(.2,.9,.3,1.2); }
+  .dialog.calm { box-shadow: 0 0 0 1px rgba(0,0,0,.7), 0 18px 60px rgba(0,0,0,.8), 0 0 40px rgba(232,182,74,.18); }
+  .dialog h2 { margin: 0 0 12px; font-size: 1.35rem; letter-spacing: .12em; color: var(--gold-soft); }
+  .dialog.bad h2 { color: #ff9d8c; }
+  .dialog .gcard.big { margin: 0 auto 12px; }
+  .dialog p { margin: 6px 0; }
+  .dialog .why { font-size: 1.08rem; font-weight: 700; }
+  .dialog .lost { color: #ffb8ad; }
+  .dialog .next { margin-top: 12px; color: var(--muted); font-size: .9rem; }
+  .dialog button { margin-top: 16px; min-width: 60%; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes popIn { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .overlay, .dialog { animation: none; } }
+  #currentCap { text-align: center; margin: 12px 0 0; font-weight: 600; }
+  #dangerLine { text-align: center; margin: 6px 0 10px; color: var(--danger); font-size: .88rem; min-height: 1.2em; }
+
+  #path { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+  .gcard.thumb { width: 66px; flex: 0 0 auto; box-shadow: 0 3px 8px rgba(0,0,0,.6); }
+  .gcard.thumb .cap { font-size: 14px; font-size: 21cqw; }
+  .gcard.thumb.hazard { outline: 2px solid rgba(255,100,80,.7); }
+  .gcard.thumb.latest { outline: 2px solid var(--gold-soft); outline-offset: 1px; }
+  #pathGems { text-align: center; margin: 10px 0 0; }
+
+  /* 玩家 */
+  .player {
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center;
+    padding: 10px 12px; margin: 7px 0; border-radius: 12px;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(232,182,74,.22);
+  }
+  .player.me { border-color: var(--gold); background: rgba(232,182,74,.09); }
+  .player .name { font-weight: 700; }
+  .player .stat { display: flex; gap: 5px; justify-content: flex-end; flex-wrap: wrap; }
+  .chip { padding: 1px 9px; border-radius: 999px; background: rgba(0,0,0,.4); border: 1px solid rgba(232,182,74,.28);
+    font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .player .state { grid-column: 1 / -1; font-size: .85rem; color: var(--muted); }
+  .player .state.ok { color: var(--jade); }
+  .tag { font-size: .7rem; padding: 1px 7px; margin-left: 6px; border-radius: 6px; vertical-align: middle; font-weight: 700;
+    background: var(--gold); color: #2b1a06; }
+  .tag.you { background: var(--jade); }
+
+  #actions { margin-top: 16px; text-align: center; }
+  #actions .hint { margin: 0 0 10px; }
+
+  /* 最終排名 */
+  .rank { margin: 8px auto 4px; max-width: 420px; text-align: left; }
+  .rank .r { display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: 6px 0; border-radius: 12px;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(232,182,74,.22); }
+  .rank .r.first { background: rgba(232,182,74,.14); border-color: var(--gold); font-size: 1.1rem; }
+  .rank .medal { width: 1.8em; text-align: center; }
+  .rank .nm { flex: 1; font-weight: 700; }
+  .rank .sc { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--gold-soft); }
+
+  /* 回合紀錄 */
+  #logWrap { margin-top: 6px; }
+  pre { white-space: pre-wrap; margin: 0; padding: 10px 12px; font-family: inherit; font-size: .92rem; line-height: 1.6;
+    border-left: 3px solid var(--gold); background: rgba(0,0,0,.35); border-radius: 0 10px 10px 0; }
+  #debug { opacity: .5; margin: 12px 0 0; }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<a class="back-lobby" href="../">‹ 桌遊大廳</a>
+<main>
+  <h1>印加寶藏</h1>
+
+  <section id="lobby" class="panel">
+    <label class="small">你的暱稱</label>
+    <input id="nameInput" maxlength="12" placeholder="暱稱（最多 12 字）" autocomplete="off">
+    <div class="row"><button id="createBtn" disabled>建立房間</button></div>
+    <div class="row">
+      <input id="codeInput" maxlength="4" placeholder="代碼" autocomplete="off">
+      <button id="joinBtn" class="secondary" disabled>加入房間</button>
+    </div>
+    <p id="lobbyMsg" class="msg"></p>
+    <p class="small center">一人建立房間，把 4 個字母的代碼給朋友。2～8 人。</p>
+    <details>
+      <summary>規則簡介</summary>
+      <p>共 5 輪。每回合先翻開一張牌，然後所有還在洞穴的人<b>同時、秘密地</b>選「繼續探險」或「回營地」，大家都選完才一起公開。</p>
+      <p>💎 寶石牌：在洞穴的人平分，除不盡的留在路上。</p>
+      <p>⚠️ 危險牌：同一種危險出現第二張時，還在洞穴的人手上的寶石全部掉光，本輪結束。</p>
+      <p>⛺ 回營地：把手上的寶石存進帳篷，並平分路上剩下的寶石。<b>只有一個人回營時</b>，才能帶走路上的神器。</p>
+      <p>5 輪後，帳篷裡分數最高的人獲勝。</p>
+    </details>
+  </section>
+
+  <section id="room" class="panel" hidden>
+    <div class="topbar">
+      <span>房間 <strong id="roomCode"></strong></span>
+      <span><span id="roundInfo"></span><span id="pips"></span></span>
+    </div>
+
+    <div id="pathWrap" hidden>
+      <h3>探險路徑 <span id="pathCount" class="small"></span></h3>
+      <div id="current"></div>
+      <p id="currentCap"></p>
+      <p id="dangerLine"></p>
+      <div id="path"></div>
+      <p id="pathGems" class="small"></p>
+    </div>
+
+    <div id="actions"></div>
+
+    <h3>玩家</h3>
+    <div id="players"></div>
+
+    <div id="logWrap" hidden>
+      <h3 id="logTitle">上一回合</h3>
+      <p id="logChoices" class="small"></p>
+      <pre id="log"></pre>
+    </div>
+
+    <div class="row">
+      <button id="startBtn" hidden></button>
+      <button id="leaveBtn" class="secondary">離開房間</button>
+    </div>
+    <p id="roomMsg" class="msg"></p>
+    <p id="debug" class="small center"></p>
+  </section>
+</main>
+
+<div id="roundEnd" class="overlay" hidden></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getDatabase, ref, onValue, runTransaction, get, set, update } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import {
+  MIN_PLAYERS, MAX_PLAYERS, ROUNDS, HAZARD_NAMES,
+  parseCard, splitList, stateFromDb, newGame, resolveTurn, dbUpdates, ranking,
+} from "./incan-logic.js?v=4";   // 改規則時把 v 的數字加 1，避免瀏覽器用到舊檔案
+
+// ===== Firebase 設定（和井字遊戲相同） =====
+const firebaseConfig = {
+  apiKey: "AIzaSyDb2OjF4VCER-Rnl4x0VXplhwYFybzFwaU",
+  authDomain: "incan-gold-d1eff.firebaseapp.com",
+  databaseURL: "https://incan-gold-d1eff-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "incan-gold-d1eff",
+  storageBucket: "incan-gold-d1eff.firebasestorage.app",
+  messagingSenderId: "969662195942",
+  appId: "1:969662195942:web:a92d0e875e81bcfc3bf327"
+};
+
+// ===== 外觀設定：圖片對應與名稱都在這裡，換圖、改名只要改這一區 =====
+// 圖片放在 img/ 資料夾，檔名不含 .webp。找不到圖片時，卡片會自動改顯示 icon。
+const IMG_DIR = "img/";
+// 寶石牌（所有寶石牌共用同一張圖，分數由卡片下方的文字顯示）
+const TREASURE_ART = { img: "treasure-crystal", icon: "💎" };
+const HAZARD_ART = {
+  snake:    { img: "hazard-snake",    icon: "🐍" },
+  spider:   { img: "hazard-spider",   icon: "🕷️" },
+  rockfall: { img: "hazard-rockfall", icon: "🪨" },
+  fire:     { img: "hazard-fire",     icon: "🔥" },
+  mummy:    { img: "hazard-mummy",    icon: "🧟" },
+};
+// 神器依「分數」對應圖片（5 件神器，分數與 incan-logic.js 的 ARTIFACT_VALUES 一致）
+const ARTIFACT_ART = {
+  5:  { img: "artifact-eagle",   name: "黃金老鷹" },
+  7:  { img: "artifact-idol",    name: "帕查卡馬克神像" },
+  8:  { img: "artifact-sceptre", name: "維拉科查權杖" },
+  10: { img: "artifact-sundisc", name: "查文太陽圓盤" },
+  12: { img: "artifact-mask",    name: "印加黃金面具" },
+};
+
+const ARTIFACT_FALLBACK = { img: "artifact-eagle", name: "神器" };
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getDatabase(app);
+
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+let uid = null;
+let code = null;
+let unsubscribe = null;
+let lastState = null;      // 資料庫裡 incan/<code> 的最新內容
+let busy = false;          // 房主正在結算時不重複結算
+let myChoice = null;       // { turn, value }：我這回合選了什麼（只存在自己的瀏覽器）
+let shownEnd = null;       // 已經跳出過「本輪結束」提示的回合（避免重複跳）
+let firstSnap = true;      // 剛進房間的第一份資料不跳提示（重新整理時不要再演一次）
+let lastCardKey = null;    // 路徑有變動時才重畫卡片並播放翻牌動畫
+
+// 記住暱稱（存不了也沒關係）
+try { $("nameInput").value = localStorage.getItem("incanName") || ""; } catch (e) {}
+function getName() {
+  const n = $("nameInput").value.trim().slice(0, 12) || "玩家";
+  try { localStorage.setItem("incanName", n); } catch (e) {}
+  return n;
+}
+const newPlayer = (name, order) => ({ name, order, tent: 0, artifacts: 0, hand: 0, inCave: true });
+
+// ===== 匿名登入 =====
+signInAnonymously(auth)
+  .then((cred) => {
+    uid = cred.user.uid;
+    $("createBtn").disabled = false;
+    $("joinBtn").disabled = false;
+  })
+  .catch((err) => {
+    $("lobbyMsg").textContent = "登入失敗：" + err.code + "（請確認已啟用匿名登入）";
+  });
+
+function randomCode() {
+  let s = "";
+  for (let i = 0; i < 4; i++) s += LETTERS[Math.floor(Math.random() * LETTERS.length)];
+  return s;
+}
+
+// ===== 建立 / 加入房間 =====
+async function createRoom() {
+  $("lobbyMsg").textContent = "";
+  const name = getName();
+  for (let i = 0; i < 5; i++) {
+    const c = randomCode();
+    try {
+      const result = await runTransaction(ref(db, "incan/" + c), (cur) => {
+        if (cur) return;   // 代碼已被使用
+        return {
+          host: uid, phase: "lobby", round: 0, turn: 0, needed: 0,
+          path: "", pathGems: 0, removed: "",
+          players: { [uid]: newPlayer(name, 1) },
+          createdAt: Date.now(),
+        };
+      });
+      if (result.committed) { enterRoom(c); return; }
+    } catch (err) {
+      // 代碼剛好重複時會被規則擋下，換一組再試
+    }
+  }
+  $("lobbyMsg").textContent = "建立失敗，請再試一次。";
+}
+
+async function joinRoom() {
+  const c = $("codeInput").value.trim().toUpperCase();
+  if (!/^[A-Z]{4}$/.test(c)) { $("lobbyMsg").textContent = "請輸入 4 個英文字母的代碼。"; return; }
+  $("lobbyMsg").textContent = "";
+  const name = getName();
+
+  try {
+    const snap = await get(ref(db, "incan/" + c));
+    if (!snap.exists()) { $("lobbyMsg").textContent = "找不到這個房間。"; return; }
+
+    const v = snap.val();
+    const players = v.players || {};
+    if (players[uid]) { enterRoom(c); return; }                 // 重新連線
+    if (v.phase !== "lobby") { $("lobbyMsg").textContent = "遊戲已經開始，不能中途加入。"; return; }
+    const n = Object.keys(players).length;
+    if (n >= MAX_PLAYERS) { $("lobbyMsg").textContent = "房間已滿（最多 " + MAX_PLAYERS + " 人）。"; return; }
+
+    await set(ref(db, "incan/" + c + "/players/" + uid), newPlayer(name, n + 1));
+    enterRoom(c);
+  } catch (err) {
+    $("lobbyMsg").textContent = "加入失敗：" + (err.code || err.message);
+  }
+}
+
+// ===== 進入房間並監聽 =====
+function enterRoom(c) {
+  code = c;
+  myChoice = null;
+  lastCardKey = null;
+  shownEnd = null; firstSnap = true; $("roundEnd").hidden = true;
+  $("lobby").hidden = true;
+  $("room").hidden = false;
+  $("roomCode").textContent = c;
+  $("roomMsg").textContent = "";
+  if (unsubscribe) unsubscribe();
+  unsubscribe = onValue(ref(db, "incan/" + c), (snap) => {
+    lastState = snap.val();
+    render();
+    checkRoundEnd();
+    maybeResolve();
+  }, (err) => {
+    $("roomMsg").textContent = "讀取失敗：" + (err.code || err.message);
+  });
+}
+
+function leaveRoom() {
+  if (unsubscribe) unsubscribe();
+  unsubscribe = null; code = null; lastState = null; myChoice = null; lastCardKey = null; $("roundEnd").hidden = true;
+  $("room").hidden = true;
+  $("lobby").hidden = false;
+  $("codeInput").value = "";
+}
+
+// ===== 卡牌 =====
+// 把牌的代碼（例如 T7、A5、Hsnake）轉成「要顯示什麼」
+function cardInfo(cardCode) {
+  const c = parseCard(cardCode);
+  if (c.type === "T") {
+    return { cls: "treasure", art: TREASURE_ART, icon: TREASURE_ART.icon, label: "寶石 " + c.value,
+      cap: "💎 " + c.value, short: String(c.value),
+      tip: "💎 寶石 " + c.value + " 顆：在洞穴的人平分" };
+  }
+  if (c.type === "A") {
+    const a = ARTIFACT_ART[c.value] || ARTIFACT_FALLBACK;
+    return { cls: "artifact", art: a, icon: "🏺", label: a.name,
+      cap: c.value + " 分", short: String(c.value),
+      tip: "🏺 神器「" + a.name + "」" + c.value + " 分：只有單獨一人回營才能帶走" };
+  }
+  const h = HAZARD_ART[c.kind] || { img: "", icon: "⚠️" };
+  const nm = HAZARD_NAMES[c.kind] || c.kind;
+  return { cls: "hazard", art: h, icon: h.icon, label: nm, cap: nm, short: "",
+    tip: "⚠️ 危險：" + nm + "！同一種再出現一張，手上的寶石就全沒了" };
+}
+
+function cardEl(cardCode, opts) {
+  const o = opts || {};
+  const info = cardInfo(cardCode);
+  const d = el("div", "gcard " + info.cls + (o.big ? " big" : " thumb")
+    + (o.latest ? " latest" : "") + (o.flip ? " flip" : ""));
+  if (info.art.img) {
+    const img = document.createElement("img");
+    img.src = IMG_DIR + info.art.img + ".webp";
+    img.alt = info.label;
+    img.addEventListener("error", () => d.classList.add("noimg"));   // 圖片載入失敗就改顯示 icon
+    d.appendChild(img);
+  } else {
+    d.classList.add("noimg");
+  }
+  d.appendChild(el("div", "fallback", info.icon));
+  const capText = o.big ? info.cap : info.short;
+  if (capText) d.appendChild(el("div", "cap", capText));
+  return d;
+}
+
+// ===== 畫面 =====
+function render() {
+  const s = lastState;
+  const actions = $("actions");
+  actions.textContent = "";
+  $("players").textContent = "";
+
+  if (!s) {
+    $("roundInfo").textContent = "";
+    $("pips").textContent = "";
+    $("pathWrap").hidden = true;
+    $("logWrap").hidden = true;
+    $("startBtn").hidden = true;
+    actions.appendChild(el("p", "", "房間不存在或已被刪除。"));
+    return;
+  }
+
+  const players = s.players || {};
+  $("debug").textContent = "v7 · " + s.phase + " · 第" + s.turn + "回合 · 已選 " + Object.keys(s.ready || {}).length + "/" + (s.needed || 0);
+  const list = Object.entries(players)
+    .map(([id, p]) => ({ id, ...p }))
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  const me = players[uid] || null;
+  const isHost = s.host === uid;
+  const ready = s.ready || {};
+  const phase = s.phase;
+
+  // --- 標題列 ---
+  if (phase === "lobby") $("roundInfo").textContent = "等待玩家加入";
+  else if (phase === "over") $("roundInfo").textContent = "遊戲結束";
+  else $("roundInfo").textContent = "第 " + s.round + " / " + ROUNDS + " 輪 · 第 " + s.turn + " 回合";
+  $("pips").textContent = "";
+  if (phase !== "lobby") {
+    for (let i = 1; i <= ROUNDS; i++) {
+      const done = phase === "over" || i < s.round;
+      $("pips").appendChild(el("span", "pip" + (done ? " done" : (i === s.round ? " now" : ""))));
+    }
+  }
+
+  // --- 路徑與最新翻開的牌 ---
+  const playing = phase === "play" || phase === "reveal";   // reveal = 房主正在結算的瞬間
+  $("pathWrap").hidden = !playing;
+  if (playing) {
+    const cards = splitList(s.path);
+    const key = s.round + "|" + s.path;
+    if (key !== lastCardKey) {                     // 路徑沒變就不重畫，避免閃爍
+      lastCardKey = key;
+      const latestCode = cards[cards.length - 1];
+      $("current").textContent = "";
+      $("path").textContent = "";
+      if (latestCode) {
+        $("current").appendChild(cardEl(latestCode, { big: true, flip: true }));
+        $("currentCap").textContent = cardInfo(latestCode).tip;
+      } else {
+        $("currentCap").textContent = "";
+      }
+      cards.forEach((c, i) => $("path").appendChild(cardEl(c, { latest: i === cards.length - 1 })));
+      $("pathCount").textContent = "（" + cards.length + " 張）";
+
+      const risky = cards.filter((c) => c[0] === "H").map((c) => HAZARD_NAMES[c.slice(1)] || c.slice(1));
+      $("dangerLine").textContent = risky.length
+        ? "⚠️ 已出現的危險：" + risky.join("、") + "（再出現同一種，手上的寶石就沒了）"
+        : "";
+    }
+    $("pathGems").textContent = "路上剩餘寶石：💎 " + (s.pathGems || 0) + " 顆（回營的人會平分）";
+  }
+
+  // --- 玩家列表 ---
+  for (const p of list) {
+    const row = el("div", "player" + (p.id === uid ? " me" : ""));
+    const nameEl = el("div", "name", p.name);
+    if (p.id === s.host) nameEl.appendChild(el("span", "tag", "房主"));
+    if (p.id === uid) nameEl.appendChild(el("span", "tag you", "你"));
+    row.appendChild(nameEl);
+
+    const stat = el("div", "stat");
+    if (phase !== "lobby") {
+      stat.appendChild(el("span", "chip", "💎 " + p.hand));
+      stat.appendChild(el("span", "chip", "⛺ " + p.tent));
+      stat.appendChild(el("span", "chip", "🏺 " + p.artifacts));
+    }
+    row.appendChild(stat);
+
+    if (playing) {
+      let st, ok = false;
+      if (!p.inCave) st = "已回到營地";
+      else if (ready[p.id] === s.turn) { st = "已做出選擇 ✔"; ok = true; }
+      else st = "思考中…";
+      row.appendChild(el("div", "state" + (ok ? " ok" : ""), st));
+    }
+    $("players").appendChild(row);
+  }
+
+  // --- 操作區 ---
+  const startBtn = $("startBtn");
+  startBtn.hidden = true;
+
+  if (phase === "lobby") {
+    const n = list.length;
+    if (isHost) {
+      actions.appendChild(el("p", "hint", "目前 " + n + " 人。把房間代碼 " + code + " 傳給朋友，人到齊後按「開始遊戲」。"));
+      startBtn.hidden = false;
+      startBtn.textContent = "開始遊戲";
+      startBtn.disabled = n < MIN_PLAYERS;
+    } else {
+      actions.appendChild(el("p", "hint", "等待房主開始遊戲…（目前 " + n + " 人）"));
+    }
+  } else if (playing) {
+    if (phase === "reveal") {
+      actions.appendChild(el("p", "hint", "大家都選好了，結算中…"));
+    } else if (!me) {
+      actions.appendChild(el("p", "hint", "你是旁觀者。"));
+    } else if (!me.inCave) {
+      actions.appendChild(el("p", "hint", "你已回到營地，等待本輪結束…"));
+    } else if (ready[uid] === s.turn) {
+      const picked = myChoice && myChoice.turn === s.turn ? (myChoice.value === "leave" ? "回營地" : "繼續探險") : "";
+      actions.appendChild(el("p", "hint", (picked ? "你選了「" + picked + "」。" : "你已做出選擇。") + "等待其他人…"));
+    } else {
+      actions.appendChild(el("p", "hint", "你手上有 " + me.hand + " 顆寶石。要冒險繼續，還是回營地？"));
+      const row = el("div", "row");
+      const goBtn = el("button", "big go", "🔥 繼續探險");
+      const backBtn = el("button", "big back", "⛺ 回營地");
+      goBtn.addEventListener("click", () => sendChoice("stay"));
+      backBtn.addEventListener("click", () => sendChoice("leave"));
+      row.appendChild(goBtn);
+      row.appendChild(backBtn);
+      actions.appendChild(row);
+    }
+  } else if (phase === "over") {
+    const rk = ranking(stateFromDb(s));
+    actions.appendChild(el("h3", "", "🏆 最終排名"));
+    const box = el("div", "rank");
+    const medals = ["🥇", "🥈", "🥉"];
+    rk.forEach((p, i) => {
+      const r = el("div", "r" + (i === 0 ? " first" : ""));
+      r.appendChild(el("span", "medal", medals[i] || String(i + 1)));
+      r.appendChild(el("span", "nm", p.name));
+      r.appendChild(el("span", "sc", p.tent + " 分"));
+      r.appendChild(el("span", "small", "🏺 " + p.artifacts));
+      box.appendChild(r);
+    });
+    actions.appendChild(box);
+    if (isHost) {
+      startBtn.hidden = false;
+      startBtn.textContent = "再玩一局";
+      startBtn.disabled = false;
+    } else {
+      actions.appendChild(el("p", "hint", "等待房主開始下一局…"));
+    }
+  }
+
+  // --- 上一回合的紀錄 ---
+  const rv = s.reveal;
+  if (rv && rv.log) {
+    $("logWrap").hidden = false;
+    $("logTitle").textContent = rv.turn ? "第 " + rv.turn + " 回合的結果" : "遊戲開始";
+    if (rv.choices) {
+      const parts = Object.entries(rv.choices).map(([id, v]) => {
+        const nm = players[id] ? players[id].name : "?";
+        return nm + "：" + (v === "leave" ? "回營" : "繼續");
+      });
+      $("logChoices").textContent = "大家的選擇 → " + parts.join("　");
+    } else {
+      $("logChoices").textContent = "";
+    }
+    $("log").textContent = rv.log;
+  } else {
+    $("logWrap").hidden = true;
+  }
+}
+
+// ===== 本輪結束提示：每一輪結束時，跳出視窗說明原因 =====
+function checkRoundEnd() {
+  const s = lastState;
+  const end = s && s.reveal && s.reveal.ended;
+  if (!end) { shownEnd = null; firstSnap = false; return; }
+  const key = end.round + "|" + s.reveal.turn;
+  const first = firstSnap;
+  firstSnap = false;
+  if (first) { shownEnd = key; return; }          // 剛進房間／重新整理：不補演
+  if (key === shownEnd) return;
+  shownEnd = key;
+  showRoundEnd(end, s);
+}
+
+function showRoundEnd(end, s) {
+  const players = s.players || {};
+  const over = s.phase === "over";
+  const box = $("roundEnd");
+  box.textContent = "";
+  const dlg = el("div", "dialog " + (end.reason === "hazard" ? "bad" : "calm"));
+  const close = () => { box.hidden = true; document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape" || e.key === "Enter") close(); };
+
+  if (end.reason === "hazard") {
+    const nm = HAZARD_NAMES[end.kind] || end.kind;
+    dlg.appendChild(el("h2", "", "⚠️ 第 " + end.round + " 輪結束！"));
+    dlg.appendChild(cardEl("H" + end.kind, { big: true, flip: true }));
+    dlg.appendChild(el("p", "why", "第二張「" + nm + "」出現了！"));
+    const lost = Object.entries(end.lost || {});
+    if (lost.length) {
+      dlg.appendChild(el("p", "", "還在洞穴的人，手上的寶石全部掉光："));
+      for (const [id, n] of lost) dlg.appendChild(el("p", "lost", (players[id] ? players[id].name : "?") + " 掉了 💎 " + n + " 顆"));
+    } else {
+      dlg.appendChild(el("p", "", "洞穴裡的人手上剛好都沒有寶石，沒有損失。"));
+    }
+    dlg.appendChild(el("p", "small", "已回營地的人不受影響。這張「" + nm + "」會從之後的牌堆移除。"));
+  } else if (end.reason === "allLeft") {
+    dlg.appendChild(el("h2", "", "⛺ 第 " + end.round + " 輪結束"));
+    dlg.appendChild(el("p", "why", "所有探險者都回營地了。"));
+  } else {
+    dlg.appendChild(el("h2", "", "第 " + end.round + " 輪結束"));
+    dlg.appendChild(el("p", "why", "牌堆用完了。"));
+  }
+  dlg.appendChild(el("p", "next", over ? "5 輪都結束了！" : "下一步：第 " + (end.round + 1) + " 輪開始，大家重新進入洞穴。"));
+  const btn = el("button", "", over ? "查看最終排名" : "進入第 " + (end.round + 1) + " 輪");
+  btn.addEventListener("click", close);
+  dlg.appendChild(btn);
+  box.appendChild(dlg);
+  box.hidden = false;
+  document.addEventListener("keydown", onKey);
+  btn.focus();
+}
+
+// ===== 玩家：送出秘密選擇 =====
+async function sendChoice(value) {
+  const s = lastState;
+  if (!s) return;
+  const msg = $("roomMsg");
+  msg.textContent = "";
+  try {
+    const updates = {};
+    updates["incanChoices/" + code + "/" + uid] = value;   // 秘密：大家選完前別人讀不到
+    updates["incan/" + code + "/ready/" + uid] = s.turn;    // 公開：只標示「我選好了」
+    await update(ref(db), updates);
+    myChoice = { turn: s.turn, value };
+    render();
+  } catch (err) {
+    msg.textContent = "送出失敗：" + (err.code || err.message);
+  }
+}
+
+// ===== 房主：開始遊戲 / 再玩一局 =====
+async function startGame() {
+  const s = lastState;
+  if (!s || s.host !== uid) return;
+  const msg = $("roomMsg");
+  msg.textContent = "";
+  const info = {};
+  for (const [id, p] of Object.entries(s.players || {})) info[id] = { name: p.name, order: p.order };
+  if (Object.keys(info).length < MIN_PLAYERS) { msg.textContent = "至少需要 " + MIN_PLAYERS + " 位玩家。"; return; }
+  try {
+    const { state, deck } = newGame(info);
+    myChoice = null;
+    await update(ref(db), dbUpdates(code, state, deck));
+  } catch (err) {
+    msg.textContent = "開始失敗：" + (err.code || err.message);
+  }
+}
+
+// ===== 房主：所有人選完後結算這個回合 =====
+function maybeResolve() {
+  const s = lastState;
+  if (!s || s.host !== uid || busy) return;
+  if (s.phase === "reveal") { hostResolve(); return; }              // 上次結算到一半（例如房主重新整理）
+  if (s.phase !== "play" || !(s.needed > 0)) return;
+  if (Object.keys(s.ready || {}).length < s.needed) return;         // 還有人沒選
+  hostResolve();
+}
+
+async function hostResolve() {
+  busy = true;
+  let done = false;
+  const msg = $("roomMsg");
+  try {
+    // 先把狀態切成 reveal，伺服器確認後，規則才允許大家讀取秘密選擇
+    if (lastState.phase !== "reveal") await set(ref(db, "incan/" + code + "/phase"), "reveal");
+    const choicesSnap = await get(ref(db, "incanChoices/" + code));
+    const deckSnap = await get(ref(db, "incanSecret/" + code + "/deck"));
+    const choices = choicesSnap.val() || {};
+    const deck = splitList(deckSnap.val());
+    const cur = stateFromDb(lastState);
+
+    // 選擇不齊全（例如先前結算到一半就中斷）→ 不結算，直接把狀態還原成 play，讓大家重新選
+    if (Object.keys(choices).length < cur.needed) {
+      await set(ref(db, "incan/" + code + "/phase"), "play");
+      return;
+    }
+    const out = resolveTurn(cur, deck, choices);
+    out.state.phase = out.state.phase === "over" ? "over" : "play";   // 一定要從 reveal 切回 play
+    await update(ref(db), dbUpdates(code, out.state, out.deck));
+    done = true;
+  } catch (err) {
+    msg.textContent = "結算失敗：" + (err.code || err.message);
+  } finally {
+    busy = false;
+  }
+  // 結算期間可能又有人選好了（例如洞穴裡只剩房主一人），結算完要再檢查一次
+  if (done) maybeResolve();
+}
+
+$("createBtn").addEventListener("click", createRoom);
+$("joinBtn").addEventListener("click", joinRoom);
+$("codeInput").addEventListener("keydown", (e) => { if (e.key === "Enter") joinRoom(); });
+$("startBtn").addEventListener("click", startGame);
+$("leaveBtn").addEventListener("click", leaveRoom);
+</script>
+</body>
+</html>
