@@ -54,10 +54,11 @@ export function inCaveIds(state) {
 }
 
 // ---------- 翻牌 ----------
-// 回傳 true 代表本輪因此結束
-function drawCard(state, deck, log) {
+// 回傳 true 代表本輪因此結束；結束的原因寫進 end（給畫面跳出「本輪結束」提示用）
+function drawCard(state, deck, log, end = {}) {
   if (deck.length === 0) {
     log.push("牌堆用完了，本輪結束。");
+    end.reason = "deckEmpty";
     return true;
   }
   const card = deck.shift();
@@ -83,7 +84,13 @@ function drawCard(state, deck, log) {
   // 危險牌
   const name = HAZARD_NAMES[c.kind];
   if (state.path.includes(card)) {
-    for (const id of ids) state.players[id].hand = 0;
+    end.reason = "hazard";
+    end.kind = c.kind;
+    end.lost = {};                                   // 誰掉了幾顆寶石（只列有掉的人）
+    for (const id of ids) {
+      if (state.players[id].hand > 0) end.lost[id] = state.players[id].hand;
+      state.players[id].hand = 0;
+    }
     state.removed.push(card);
     log.push(`又翻出「${name}」！還在洞穴裡的人手上的寶石全部掉光，本輪結束。`);
     return true;
@@ -176,11 +183,13 @@ export function resolveTurn(stateIn, deckIn, choices, rng = Math.random) {
   }
 
   let roundEnded;
+  const end = {};
   if (inCaveIds(state).length === 0) {
     roundEnded = true;
+    end.reason = "allLeft";
     log.push("所有探險者都回營地了，本輪結束。");
   } else {
-    roundEnded = drawCard(state, deck, log);
+    roundEnded = drawCard(state, deck, log, end);
   }
 
   let newDeck = deck;
@@ -189,6 +198,7 @@ export function resolveTurn(stateIn, deckIn, choices, rng = Math.random) {
   state.turn += 1;
   state.needed = state.phase === "over" ? 0 : inCaveIds(state).length;
   state.reveal = { turn: stateIn.turn, choices: shown, log: log.join("\n") };
+  if (roundEnded) state.reveal.ended = { round: stateIn.round, ...end };   // 本輪為什麼結束
   return { state, deck: newDeck };
 }
 

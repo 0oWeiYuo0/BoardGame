@@ -139,6 +139,26 @@
     100% { transform: perspective(700px) rotateY(0) scale(1); opacity: 1; filter: none; }
   }
   @media (prefers-reduced-motion: reduce) { .gcard.flip { animation: none; } }
+  /* ===== 本輪結束提示 ===== */
+  .overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: rgba(6,4,3,.78); backdrop-filter: blur(2px); animation: fadeIn .25s ease-out; }
+  .dialog { width: min(100%, 400px); max-height: 100%; overflow-y: auto; text-align: center; padding: 22px 20px 20px;
+    border-radius: 14px; border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--panel-top), var(--panel-bottom));
+    box-shadow: 0 0 0 1px rgba(0,0,0,.7), 0 18px 60px rgba(0,0,0,.8), 0 0 40px rgba(255,90,70,.18);
+    animation: popIn .35s cubic-bezier(.2,.9,.3,1.2); }
+  .dialog.calm { box-shadow: 0 0 0 1px rgba(0,0,0,.7), 0 18px 60px rgba(0,0,0,.8), 0 0 40px rgba(232,182,74,.18); }
+  .dialog h2 { margin: 0 0 12px; font-size: 1.35rem; letter-spacing: .12em; color: var(--gold-soft); }
+  .dialog.bad h2 { color: #ff9d8c; }
+  .dialog .gcard.big { margin: 0 auto 12px; }
+  .dialog p { margin: 6px 0; }
+  .dialog .why { font-size: 1.08rem; font-weight: 700; }
+  .dialog .lost { color: #ffb8ad; }
+  .dialog .next { margin-top: 12px; color: var(--muted); font-size: .9rem; }
+  .dialog button { margin-top: 16px; min-width: 60%; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes popIn { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .overlay, .dialog { animation: none; } }
   #currentCap { text-align: center; margin: 12px 0 0; font-weight: 600; }
   #dangerLine { text-align: center; margin: 6px 0 10px; color: var(--danger); font-size: .88rem; min-height: 1.2em; }
 
@@ -245,6 +265,8 @@
   </section>
 </main>
 
+<div id="roundEnd" class="overlay" hidden></div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -252,7 +274,7 @@ import { getDatabase, ref, onValue, runTransaction, get, set, update } from "htt
 import {
   MIN_PLAYERS, MAX_PLAYERS, ROUNDS, HAZARD_NAMES,
   parseCard, splitList, stateFromDb, newGame, resolveTurn, dbUpdates, ranking,
-} from "./incan-logic.js?v=3";   // 改規則時把 v 的數字加 1，避免瀏覽器用到舊檔案
+} from "./incan-logic.js?v=4";   // 改規則時把 v 的數字加 1，避免瀏覽器用到舊檔案
 
 // ===== Firebase 設定（和井字遊戲相同） =====
 const firebaseConfig = {
@@ -307,6 +329,8 @@ let unsubscribe = null;
 let lastState = null;      // 資料庫裡 incan/<code> 的最新內容
 let busy = false;          // 房主正在結算時不重複結算
 let myChoice = null;       // { turn, value }：我這回合選了什麼（只存在自己的瀏覽器）
+let shownEnd = null;       // 已經跳出過「本輪結束」提示的回合（避免重複跳）
+let firstSnap = true;      // 剛進房間的第一份資料不跳提示（重新整理時不要再演一次）
 let lastCardKey = null;    // 路徑有變動時才重畫卡片並播放翻牌動畫
 
 // 記住暱稱（存不了也沒關係）
@@ -388,6 +412,7 @@ function enterRoom(c) {
   code = c;
   myChoice = null;
   lastCardKey = null;
+  shownEnd = null; firstSnap = true; $("roundEnd").hidden = true;
   $("lobby").hidden = true;
   $("room").hidden = false;
   $("roomCode").textContent = c;
@@ -396,6 +421,7 @@ function enterRoom(c) {
   unsubscribe = onValue(ref(db, "incan/" + c), (snap) => {
     lastState = snap.val();
     render();
+    checkRoundEnd();
     maybeResolve();
   }, (err) => {
     $("roomMsg").textContent = "讀取失敗：" + (err.code || err.message);
@@ -404,7 +430,7 @@ function enterRoom(c) {
 
 function leaveRoom() {
   if (unsubscribe) unsubscribe();
-  unsubscribe = null; code = null; lastState = null; myChoice = null; lastCardKey = null;
+  unsubscribe = null; code = null; lastState = null; myChoice = null; lastCardKey = null; $("roundEnd").hidden = true;
   $("room").hidden = true;
   $("lobby").hidden = false;
   $("codeInput").value = "";
@@ -469,7 +495,7 @@ function render() {
   }
 
   const players = s.players || {};
-  $("debug").textContent = "v6 · " + s.phase + " · 第" + s.turn + "回合 · 已選 " + Object.keys(s.ready || {}).length + "/" + (s.needed || 0);
+  $("debug").textContent = "v7 · " + s.phase + " · 第" + s.turn + "回合 · 已選 " + Object.keys(s.ready || {}).length + "/" + (s.needed || 0);
   const list = Object.entries(players)
     .map(([id, p]) => ({ id, ...p }))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
@@ -620,6 +646,59 @@ function render() {
   } else {
     $("logWrap").hidden = true;
   }
+}
+
+// ===== 本輪結束提示：每一輪結束時，跳出視窗說明原因 =====
+function checkRoundEnd() {
+  const s = lastState;
+  const end = s && s.reveal && s.reveal.ended;
+  if (!end) { shownEnd = null; firstSnap = false; return; }
+  const key = end.round + "|" + s.reveal.turn;
+  const first = firstSnap;
+  firstSnap = false;
+  if (first) { shownEnd = key; return; }          // 剛進房間／重新整理：不補演
+  if (key === shownEnd) return;
+  shownEnd = key;
+  showRoundEnd(end, s);
+}
+
+function showRoundEnd(end, s) {
+  const players = s.players || {};
+  const over = s.phase === "over";
+  const box = $("roundEnd");
+  box.textContent = "";
+  const dlg = el("div", "dialog " + (end.reason === "hazard" ? "bad" : "calm"));
+  const close = () => { box.hidden = true; document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape" || e.key === "Enter") close(); };
+
+  if (end.reason === "hazard") {
+    const nm = HAZARD_NAMES[end.kind] || end.kind;
+    dlg.appendChild(el("h2", "", "⚠️ 第 " + end.round + " 輪結束！"));
+    dlg.appendChild(cardEl("H" + end.kind, { big: true, flip: true }));
+    dlg.appendChild(el("p", "why", "第二張「" + nm + "」出現了！"));
+    const lost = Object.entries(end.lost || {});
+    if (lost.length) {
+      dlg.appendChild(el("p", "", "還在洞穴的人，手上的寶石全部掉光："));
+      for (const [id, n] of lost) dlg.appendChild(el("p", "lost", (players[id] ? players[id].name : "?") + " 掉了 💎 " + n + " 顆"));
+    } else {
+      dlg.appendChild(el("p", "", "洞穴裡的人手上剛好都沒有寶石，沒有損失。"));
+    }
+    dlg.appendChild(el("p", "small", "已回營地的人不受影響。這張「" + nm + "」會從之後的牌堆移除。"));
+  } else if (end.reason === "allLeft") {
+    dlg.appendChild(el("h2", "", "⛺ 第 " + end.round + " 輪結束"));
+    dlg.appendChild(el("p", "why", "所有探險者都回營地了。"));
+  } else {
+    dlg.appendChild(el("h2", "", "第 " + end.round + " 輪結束"));
+    dlg.appendChild(el("p", "why", "牌堆用完了。"));
+  }
+  dlg.appendChild(el("p", "next", over ? "5 輪都結束了！" : "下一步：第 " + (end.round + 1) + " 輪開始，大家重新進入洞穴。"));
+  const btn = el("button", "", over ? "查看最終排名" : "進入第 " + (end.round + 1) + " 輪");
+  btn.addEventListener("click", close);
+  dlg.appendChild(btn);
+  box.appendChild(dlg);
+  box.hidden = false;
+  document.addEventListener("keydown", onKey);
+  btn.focus();
 }
 
 // ===== 玩家：送出秘密選擇 =====
